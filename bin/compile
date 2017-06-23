@@ -1,56 +1,46 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# bin/compile <build-dir> <cache-dir> <env-dir>
 
 # setup
-YELLOW='\033[1;33m'
-RED='\033[1;31m'
-NC='\033[0m' # No Color
+set -e
+set -o pipefail
+set -u
+
+BUILD_DIR=$1
+CACHE_DIR=$2
+ENV_DIR=$3
+BP_DIR=`cd $(dirname $0); cd ..; pwd`
 CURL="curl -s -L --retry 15 --retry-delay 2" # retry for up to 30 seconds
 
-mkdir -p "$1" "$2"
-build_dir=$(cd "$1/" && pwd)
-cache_dir=$(cd "$2/" && pwd)
-env_dir="${3}"
+PKG_NAME="github.com/Skookum/digital-mouth-campaign-mgmt-api" # TODO
+BINARY_NAME="campaign-mgmt-api" # TODO
 
 
 # utils
-indent() {
-  sed -u 's/^/       /'
-}
+log_indent() { sed -u 's/^/       /'; }
+log_info() { echo "$@" | log_indent; }
+log_step() { echo "-----> $@"; }
 
-info() {
-  echo "$@" | indent
-}
 
-warn() {
-  echo -e "${YELLOW} !!    $@${NC}" | indent
-}
-
-err() {
-  echo -e >&2 "${RED} !!    $@${NC}" | indent
-}
-
-step() {
-  echo "-----> $@"
-}
-
+# blocks
 ensureGo() {
   local goVersion="go1.8.3" # TODO
-  local goPath="${cache_dir}/go/${goVersion}"
+  local goPath="${CACHE_DIR}/go/${goVersion}"
   local goFile="${goVersion}.linux-amd64.tar.gz"
   local goRepo="https://storage.googleapis.com/golang"
 
   if [ -d "${goPath}" ]; then
-    step "Using ${goVersion}"
+    log_step "Using ${goVersion}"
   else
-    step "Installing ${goVersion}"
+    log_step "Installing ${goVersion}"
 
-    rm -rf ${cache_dir}/*
+    rm -rf "${CACHE_DIR}/*"
     mkdir -p "${goPath}"
 
     pushd "${goPath}" &> /dev/null
-      info "Fetching ${goFile}"
-      ${CURL} "${goRepo}/${goFile}"
-      tar -C ${goPath} --strip-components=1 -zxf "${goPath}/${goFile}"
+      log_info "Fetching ${goFile}"
+      ${CURL} -O "${goRepo}/${goFile}"
+      tar -C "${goPath}" --strip-components=1 -zxf "${goPath}/${goFile}"
       rm -f "${goPath}/${goFile}"
     popd &> /dev/null
   fi
@@ -61,17 +51,18 @@ ensureGo() {
 
 ensureDep() {
   local depVersion="master" # TODO
-  GOPATH="${cache_dir}/dep/${depVersion}"
+  GOPATH="${CACHE_DIR}/dep/${depVersion}"
   PATH="${GOPATH}/bin:${PATH}"
 
   if [ -d "${GOPATH}" ]; then
-    step "Using Dep ${depVersion}"
+    log_step "Using Dep ${depVersion}"
   else
-    step "Installing Dep ${depVersion}"
+    log_step "Installing Dep ${depVersion}"
 
-    rm -rf "${cache_dir}/dep/*"
+    rm -rf "${CACHE_DIR}/dep/*"
     mkdir -p "${GOPATH}"
 
+    log_info "Fetching Dep's source"
     go get -u -v github.com/golang/dep/cmd/dep
     go install -v github.com/golang/dep/cmd/dep
   fi
@@ -79,57 +70,62 @@ ensureDep() {
 
 ensureBuffalo() {
   local buffaloVersion="0.9.0" # TODO
-  GOPATH="${cache_dir}/buffalo/${buffaloVersion}"
+  GOPATH="${CACHE_DIR}/buffalo/${buffaloVersion}"
   PATH="${GOPATH}/bin:${PATH}"
 
   if [ -d "${GOPATH}" ]; then
-    step "Using Buffalo ${buffaloVersion}"
+    log_step "Using Buffalo ${buffaloVersion}"
   else
-    step "Installing Buffalo ${buffaloVersion}"
+    log_step "Installing Buffalo ${buffaloVersion}"
 
-    rm -rf "${cache_dir}/buffalo/*"
+    rm -rf "${CACHE_DIR}/buffalo/*"
     mkdir -p "${GOPATH}"
 
-    go get -u -v -tags nosqlite github.com/gobuffalo/buffalo/buffalo
+    log_info "Fetching Buffalo's source"
+    go get -u -v github.com/gobuffalo/buffalo/buffalo
     go install -v github.com/gobuffalo/buffalo/buffalo
   fi
 }
 
 setGOPATH() {
-  local name="${1}"
+  local name="$1"
   local tmp="$(mktemp -d)"
 
   GOPATH="${tmp}/.go"
   local src_dir="${GOPATH}/src/${name}"
   mkdir -p "${src_dir}"
-  cp -R ${build_dir}/* ${src_dir}
+  cp -R ${BUILD_DIR}/* ${src_dir}
 
   echo "GOPATH=${GOPATH}"
   echo "src_dir=${src_dir}"
 }
 
 buildApp() {
-  eval "$(setGOPATH ${1})"
+  local pkg="${1}"
+  eval "$(setGOPATH ${pkg})"
   cd "${src_dir}"
 
-  step "Fetching dependencies (dep ensure -update)"
-  dep ensure -update 2>&1
+  log_step "Fetching dependencies (dep ensure)"
+  log_info "Using GOPATH=${GOPATH}"
+  log_info "Using src_dir=${src_dir}"
+  dep ensure 2>&1
 
-  step "Building application (buffalo build --static)"
-  mkdir -p "${build_dir}/bin"
-  buffalo build --static -o "${build_dir}/bin/${2}"
+  log_step "Building application (buffalo build --static)"
+  log_info "Binary output=${BUILD_DIR}/bin/${2}"
+  mkdir -p "${BUILD_DIR}/bin"
+  buffalo build --static -o "${BUILD_DIR}/bin/${2}"
 
-  PATH="${build_dir}/bin:${PATH}"
+  PATH="${BUILD_DIR}/bin:${PATH}"
 }
 
 genProcfile() {
-  echo -e "web: $(basename $1)" > $build_dir/Procfile
+  echo -e "web: $(basename $1)" > "${BUILD_DIR}/Procfile"
 }
 
 genProfileD() {
-  cd $build_dir
-  mkdir -p $build_dir/.profile.d
-  echo 'PATH=$PATH:$HOME/bin' > $build_dir/.profile.d/go.sh
+  cd "${BUILD_DIR}"
+  mkdir -p "${BUILD_DIR}/.profile.d"
+  echo 'PATH=$PATH:$HOME/bin' > "${BUILD_DIR}/.profile.d/go.sh"
 }
 
 
@@ -137,10 +133,6 @@ genProfileD() {
 ensureGo
 ensureDep
 ensureBuffalo
-
-local pkgName="github.com/Skookum/digital-mouth-campaign-mgmt-api" # TODO
-local binaryName="campaign-mgmt-api" # TODO
-
-buildApp "${pkgName}" "${binaryName}"
-genProcfile "${binaryName}"
+buildApp "${PKG_NAME}" "${BINARY_NAME}"
+genProcfile "${BINARY_NAME}"
 genProfileD
