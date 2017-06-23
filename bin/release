@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# we don't want to provision anything by default
+echo "--- {}"

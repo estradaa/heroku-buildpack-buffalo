@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# this pack is valid for Buffalo apps with a .buffalo.dev.yml in the root
+if [ -f $1/.buffalo.dev.yml ]; then
+  echo "Buffalo"
+  exit 0
+else
+  exit 1
+fi
