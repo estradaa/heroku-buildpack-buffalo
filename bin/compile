@@ -15,6 +15,9 @@ CURL="curl -s -L --retry 15 --retry-delay 2" # retry for up to 30 seconds
 PKG_NAME="github.com/Skookum/digital-mouth-campaign-mgmt-api" # TODO
 BINARY_NAME="campaign-mgmt-api" # TODO
 
+# TODO: delete me
+rm -rf "${CACHE_DIR}/*"
+
 
 # utils
 log_indent() { sed -u 's/^/       /'; }
