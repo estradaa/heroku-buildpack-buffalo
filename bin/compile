@@ -126,6 +126,12 @@ genProcfile() {
   echo -e "web: $(basename $1)" > $build_dir/Procfile
 }
 
+genProfileD() {
+  cd $build_dir
+  mkdir -p $build_dir/.profile.d
+  echo 'PATH=$PATH:$HOME/bin' > $build_dir/.profile.d/go.sh
+}
+
 
 # main
 ensureGo
@@ -137,3 +143,4 @@ local binaryName="campaign-mgmt-api" # TODO
 
 buildApp "${pkgName}" "${binaryName}"
 genProcfile "${binaryName}"
+genProfileD
