@@ -115,6 +115,8 @@ buildApp() {
   log_step "Building application (buffalo build --static)"
   log_info "Binary output=${BUILD_DIR}/bin/${2}"
   mkdir -p "${BUILD_DIR}/bin"
+  log_info pwd
+  log_info ls
   buffalo build --static -o "${BUILD_DIR}/bin/${2}"
 
   PATH="${BUILD_DIR}/bin:${PATH}"
