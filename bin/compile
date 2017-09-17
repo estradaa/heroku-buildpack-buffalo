@@ -119,6 +119,7 @@ buildApp() {
   pwd
   echo "this is ls result"
   ls
+  echo "buffalo build --static -o ${BUILD_DIR}/bin/${2}"
   buffalo build --static -o "${BUILD_DIR}/bin/${2}"
 
   PATH="${BUILD_DIR}/bin:${PATH}"
